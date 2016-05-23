@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from scipy import linalg
 
 class phyloTree(object):
     """phyloTree is a phylogenetic tree"""
@@ -53,14 +54,82 @@ class phyloTree(object):
 
             return out
 
+        # keep the tree schema around so that we have something to recurse on
+        self.treeSchema = treeSchema
         # the edges tell us the branch lengths of the tree and the structure of the tree
         self.edges = parseSchema( treeSchema)
 
-        # nucleotide rate matrices
+        # default nucleotide rate matrices. These are just a stand in for the priors.
         self.background = 0.25 * np.ones( (4,1) )   # background rates
-        self.transition = 0.25 * np.ones((4,4))     # transition rates
+        self.transition = 0.25 * np.ones( (4,4) )   # transition rates
+        for i in range(4):
+            self.transition[i,i] = -0.75
 
 
+    def findLikelihood(self, alignmentCol):
+        """ Felsensteins pruning algorithm to compute likelihood of a column of an alignment given the tree structure"""
+
+        numNodes = self.edges.shape[0]
+
+        def findMessage(nodeIndex, content):
+            # the message is f(parent) = P( index | parent, branch length)
+
+            if nodeIndex == 0:
+                # check for the root node
+                probMat = self.background                       # just the background rates
+            else:
+                branchLength = max( self.edges[nodeIndex, :nodeIndex ] ) 
+                probMat = self.ratesToProbs( branchLength )             # implicitely uses the transition matrices
+
+            XtoContent = np.dot( content, probMat)      # probability of the content given the parental node.
+
+            return XtoContent
+
+        memo = {}
+        alignIndex = 0              # we might have to reverse the order of the alignment
+        for nodeIndex in range(numNodes-1, -1, -1):
+            # iterate backwards through the matrix of edges
+            if max( self.edges[nodeIndex, nodeIndex:]) < 1E-4:
+                # do the leaf thing
+                leafValue = self.letterToVector( alignmentCol[ alignIndex ] )
+                alignIndex += 1
+
+                memo[nodeIndex] = findMessage( nodeIndex, leafValue)
+
+            else:
+                # do the node thing
+
+                # product the messages
+                runningProd = 1
+                for child in range(nodeIndex, numNodes):
+                    if self.edges[ nodeIndex, child ] != 0:
+                        runningProd *= memo[child]
+
+                # marginalize out the current node.
+                fullMessage = findMessage(nodeIndex, runningProd )
+                memo[nodeIndex] = fullMessage
+
+        return  memo
+
+
+
+
+    # utilities
+    def ratesToProbs(self, time):
+        """ returns nucleotide probabilities from lengths"""
+        return linalg.expm(time*self.transition)
+
+
+    def letterToVector(self, letter):
+        """ returns the vector corresponding to a element of the alphabet"""
+        if letter.lower() == 'a':
+            return np.array( [1, 0, 0, 0])
+        elif letter.lower() == 'c':
+            return np.array( [0, 1, 0, 0])
+        elif letter.lower() == 'g':
+            return np.array( [0, 0, 1, 0])
+        elif letter.lower() == 't':
+            return np.array( [0, 0, 0, 1])
 
 
     def checkParams(self):
@@ -68,8 +137,8 @@ class phyloTree(object):
         if abs( sum(self.background) - 1.0 ) > 1e-3:
             raise Exception( "Background rates must sum to 1")
         for row in range( self.transition.shape[0]):
-            if abs( sum( self.transition[row, :] ) - 1.0 ) > 1e-3:
-                raise Exception( "Transistion rates must sum to 1. Row " + str(row) )
+            if abs( sum( self.transition[row, :] ) ) > 1e-3:
+                raise Exception( "Transistion rates must sum to 0. Row " + str(row) )
 
 
     def getConnections(self, index):

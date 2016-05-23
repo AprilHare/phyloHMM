@@ -1,11 +1,13 @@
 # implements a phylogenetic tree emissions for hmmlearn based hmms.
 
 import numpy as ny
+
 from hmmlearn import hmm
+from phyloTree import phyloTree
 
 class phyloHMM(hmm._BaseHMM):
     """phyloHMM is a subclass of hmmlearn hmms for which the emissions are phylogenetic models"""
-    def __init__(self, n_components=1, covariance_type='diag',
+    def __init__(self, treeSchema, n_components=1, covariance_type='diag',
                  min_covar=1e-3,
                  startprob_prior=1.0, transmat_prior=1.0,
                  means_prior=0, means_weight=0,
@@ -23,6 +25,13 @@ class phyloHMM(hmm._BaseHMM):
                           random_state=random_state,
                           n_iter=n_iter, tol=tol, verbose=verbose,
                           params=params, init_params=init_params)
+
+
+        # initialize the the phyloHMM models
+        self.phyloTrees_ = []
+        for index in range(self.n_components):
+            self.phyloTrees_.append( phyloTree(treeSchema))
+
 
 
     # functions that we must overwrite from the _BaseHMM class
