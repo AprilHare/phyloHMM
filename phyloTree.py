@@ -109,7 +109,7 @@ class phyloTree(object):
                 fullMessage = findMessage(nodeIndex, runningProd )
                 memo[nodeIndex] = fullMessage
 
-        return  memo
+        return  memo[0][0]
 
 
 
