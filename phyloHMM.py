@@ -53,8 +53,9 @@ class phyloHMM(hmm._BaseHMM):
 
     def _generate_sample_from_state(self, state, random_state=None):
         # Generates a random sample from a given component.
-        #phyloModel = self.phyloBasis_[state]
-        pass
+        phyloModel = self.phyloBasis_[state]
+        return phyloModel.treeSample( random_state )
+
 
     def _compute_log_likelihood(self, X):
         # Computes per-component log probability under the model.

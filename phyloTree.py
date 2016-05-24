@@ -1,5 +1,7 @@
 #implements a phylogenetic tree class
 
+# !! check the 
+
 import numpy as np
 
 from scipy import linalg
@@ -111,10 +113,50 @@ class phyloTree(object):
 
         return  memo[0][0]
 
+    def treeSample(self, random_state=None ):
+        """ Returns a random sample state from the tree. With the random seed random_state"""
+        if random_state is not None:
+            # set the seed.
+            np.random.seed( random_state)
 
+        numNodes = self.edges.shape[0]
+
+        # make alphabet array
+        alphabet = np.chararray( (4,) )
+        alphabet[0] = 'A'
+        alphabet[1] = 'C'
+        alphabet[2] = 'G'
+        alphabet[3] = 'T'
+
+        alignmentOut = ''
+        memo = {}
+        # work down the tree to generate random states:
+        for nodeIndex in range(numNodes):
+            print memo
+            if nodeIndex == 0:
+                # the root.
+                memo[nodeIndex ] = self.letterToVector( np.random.choice( alphabet, p=self.background.squeeze() ) )
+
+            else:
+                # the node will have a single parent
+                parentNode = np.argmax( self.edges[nodeIndex, :nodeIndex])
+                probMat = self.ratesToProbs( self.edges[nodeIndex, parentNode] )
+
+                newProbs = np.dot( probMat, memo[parentNode].T )
+                memo[nodeIndex] = self.letterToVector( np.random.choice( alphabet, p=newProbs.squeeze() ) )
+
+
+            if max( self.edges[nodeIndex, nodeIndex:]) < 1E-4:
+                # the node is a a leaf. Generate an emitted letter.
+                alignmentOut += np.random.choice( alphabet, p=memo[nodeIndex] )
+
+
+        alignmentOut = alignmentOut[::-1]
+        return alignmentOut
 
 
     # utilities
+
     def ratesToProbs(self, time):
         """ returns nucleotide probabilities from lengths"""
         return linalg.expm(time*self.transition)
